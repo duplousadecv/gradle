@@ -15,6 +15,7 @@
  */
 package org.gradle.nativeplatform.toolchain.internal.gcc;
 
+import com.google.common.collect.ImmutableList;
 import org.gradle.internal.operations.BuildOperationExecutor;
 import org.gradle.internal.work.WorkerLeaseService;
 import org.gradle.language.base.internal.compile.Compiler;
@@ -78,7 +79,7 @@ class GccPlatformToolProvider extends AbstractPlatformToolProvider {
         GccVersionResult gccMetadata = gccMetadata(cppCompilerTool);
         CppCompiler cppCompiler = new CppCompiler(buildOperationExecutor, compilerOutputFileNamingSchemeFactory, commandLineTool(cppCompilerTool), context(cppCompilerTool), getObjectFileExtension(), useCommandFile, workerLeaseService);
         OutputCleaningCompiler<CppCompileSpec> outputCleaningCompiler = new OutputCleaningCompiler<CppCompileSpec>(cppCompiler, compilerOutputFileNamingSchemeFactory, getObjectFileExtension());
-        return versionAwareCompiler(outputCleaningCompiler, gccMetadata.getVersion());
+        return versionAwareCompiler(outputCleaningCompiler, gccMetadata.getVersion(), gccMetadata.getSystemIncludes());
     }
 
     @Override
@@ -90,11 +91,11 @@ class GccPlatformToolProvider extends AbstractPlatformToolProvider {
     }
 
     private <T extends NativeCompileSpec> VersionAwareCompiler<T> versionAwareCompiler(OutputCleaningCompiler<T> outputCleaningCompiler) {
-        return versionAwareCompiler(outputCleaningCompiler, VersionNumber.UNKNOWN);
+        return versionAwareCompiler(outputCleaningCompiler, VersionNumber.UNKNOWN, ImmutableList.<File>of());
     }
 
-    private <T extends NativeCompileSpec> VersionAwareCompiler<T> versionAwareCompiler(OutputCleaningCompiler<T> outputCleaningCompiler, VersionNumber version) {
-        return new VersionAwareCompiler<T>(outputCleaningCompiler, metaDataProvider.isClang() ? ClangToolChain.DEFAULT_NAME : GccToolChain.DEFAULT_NAME, version);
+    private <T extends NativeCompileSpec> VersionAwareCompiler<T> versionAwareCompiler(OutputCleaningCompiler<T> outputCleaningCompiler, VersionNumber version, ImmutableList<File> systemIncludes) {
+        return new VersionAwareCompiler<T>(outputCleaningCompiler, metaDataProvider.isClang() ? ClangToolChain.DEFAULT_NAME : GccToolChain.DEFAULT_NAME, version, systemIncludes);
     }
 
     @Override
@@ -103,7 +104,7 @@ class GccPlatformToolProvider extends AbstractPlatformToolProvider {
         GccVersionResult gccMetadata = gccMetadata(cCompilerTool);
         CCompiler cCompiler = new CCompiler(buildOperationExecutor, compilerOutputFileNamingSchemeFactory, commandLineTool(cCompilerTool), context(cCompilerTool), getObjectFileExtension(), useCommandFile, workerLeaseService);
         OutputCleaningCompiler<CCompileSpec> outputCleaningCompiler = new OutputCleaningCompiler<CCompileSpec>(cCompiler, compilerOutputFileNamingSchemeFactory, getObjectFileExtension());
-        return versionAwareCompiler(outputCleaningCompiler, gccMetadata.getVersion());
+        return versionAwareCompiler(outputCleaningCompiler, gccMetadata.getVersion(), gccMetadata.getSystemIncludes());
     }
 
     @Override
