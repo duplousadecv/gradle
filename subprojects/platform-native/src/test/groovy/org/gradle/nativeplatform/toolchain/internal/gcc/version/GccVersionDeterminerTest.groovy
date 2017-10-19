@@ -26,6 +26,8 @@ import org.gradle.util.VersionNumber
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import java.util.regex.Matcher
+
 @UsesNativeServices
 class GccVersionDeterminerTest extends Specification {
     def execActionFactory = Mock(ExecActionFactory)
@@ -208,7 +210,7 @@ End of search list.
     }
 
     def "parses gcc system includes"() {
-        def includes = ['/usr/local', '/usr/some/dir']
+        def includes = ['/usr/local', '/usr/some/dir'].collect { it.replaceAll('/', Matcher.quoteReplacement(File.separator))}
         expect:
         def result = output gcc4, gccVerboseOutput(includes), false
         result.systemIncludes*.path == includes
@@ -219,8 +221,8 @@ End of search list.
             '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/9.0.0/include',
             '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include',
             '/usr/include'
-        ]
-        def frameworks = ['/System/Library/Frameworks', '/Library/Frameworks']
+        ].collect { it.replaceAll('/', Matcher.quoteReplacement(File.separator))}
+        def frameworks = ['/System/Library/Frameworks', '/Library/Frameworks'].collect { it.replaceAll('/', Matcher.quoteReplacement(File.separator))}
         expect:
         def result = output clang, clangVerboseOutput(includes, frameworks), true
         result.systemIncludes*.path == includes
