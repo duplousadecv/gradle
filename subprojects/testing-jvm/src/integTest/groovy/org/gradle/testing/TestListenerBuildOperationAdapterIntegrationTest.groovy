@@ -51,7 +51,6 @@ class TestListenerBuildOperationAdapterIntegrationTest extends AbstractIntegrati
         suiteTestOps*.details.testDescriptor.name == ["ok", "fail", "otherFail", "otherOk"]
         suiteTestOps*.details.testDescriptor.className == ["org.gradle.Test", "org.gradle.Test", "org.gradle.OtherTest", "org.gradle.OtherTest"]
         suiteTestOps*.details.testDescriptor.composite == [false, false, false, false]
-        suiteTestOps*.details.testDescriptor.composite == [false, false, false, false]
 
         def testTestOps = directChildren(firstLevelTestOps[0], ExecuteTestBuildOperationType)
         testTestOps.size() == 2
@@ -70,6 +69,42 @@ class TestListenerBuildOperationAdapterIntegrationTest extends AbstractIntegrati
         testOutput*.result.output.message == ["sys out ok\n" , "sys err ok\n"]
         testOutput*.result.output.destination == ["StdOut", "StdErr"]
     }
+
+    def "emitsBuildOperationsForTestNgTests"() {
+        when:
+        runAndFail "test"
+
+        then:"test build operations are emitted in expected hierarchy"
+        def rootTestOp = operations.first(ExecuteTestBuildOperationType)
+        rootTestOp.details.testDescriptor.name.startsWith("Gradle Test Executor ")
+        rootTestOp.details.testDescriptor.className == null
+        rootTestOp.details.testDescriptor.composite == true
+
+        def firstLevelTestOps = directChildren(rootTestOp, ExecuteTestBuildOperationType)
+        firstLevelTestOps.size() == 1
+        firstLevelTestOps.details.testDescriptor.name == ["SimpleSuite"]
+        firstLevelTestOps.details.testDescriptor.className == [null]
+        firstLevelTestOps.details.testDescriptor.composite == [true]
+
+        def suiteTestOps = directChildren(firstLevelTestOps[0], ExecuteTestBuildOperationType)
+        suiteTestOps.size() == 1
+        suiteTestOps*.details.testDescriptor.name == ["SimpleTest"]
+        suiteTestOps*.details.testDescriptor.className == [null]
+        suiteTestOps*.details.testDescriptor.composite == [true]
+
+        def suiteTestTestOps = directChildren(suiteTestOps[0], ExecuteTestBuildOperationType)
+        suiteTestTestOps.size() == 3
+        suiteTestTestOps*.details.testDescriptor.name == ["fail", "ok", "anotherOk"]
+        suiteTestTestOps*.details.testDescriptor.className == ["org.gradle.FooTest", "org.gradle.FooTest", "org.gradle.BarTest"]
+        suiteTestTestOps*.details.testDescriptor.composite == [false, false, false]
+
+        and:"outputs are emitted in test build operation hierarchy"
+        def testOutput = directChildren(suiteTestTestOps[1], TestOutputBuildOperationType)
+        testOutput.size() == 2
+        testOutput*.result.output.message == ["sys out ok\n" , "sys err ok\n"]
+        testOutput*.result.output.destination == ["StdOut", "StdErr"]
+    }
+
 
     def directChildren(BuildOperationRecord parent, Class<ExecuteTestBuildOperationType> operationType) {
         return operations.search(parent, operationType) { it.parentId == parent.id }
