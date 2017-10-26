@@ -16,18 +16,24 @@
 
 package org.gradle.api.tasks.testing;
 
-/**
- * Result describing Test Build Operation Result
- */
-public class BuildOperationTestResult implements TestBuildOperationType.Result {
-    final TestResult result;
+import org.gradle.internal.operations.BuildOperationType;
 
-    public BuildOperationTestResult(TestResult testResult) {
-        this.result = testResult;
+/**
+ * Build Operations for Test Results
+ * */
+public class ExecuteTestBuildOperationType implements BuildOperationType<ExecuteTestBuildOperationType.Details, ExecuteTestBuildOperationType.Result> {
+
+    /**
+     * Details of a running Test
+     * */
+    public interface Details {
+        TestDescriptor getTestDescriptor();
     }
 
-    @Override
-    public TestResult getResult() {
-        return result;
+    /**
+     * Result of a running Test
+     * */
+    public interface Result {
+        TestResult getResult();
     }
 }
