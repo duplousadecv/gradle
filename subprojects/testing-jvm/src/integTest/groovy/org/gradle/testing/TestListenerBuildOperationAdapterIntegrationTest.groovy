@@ -17,9 +17,11 @@
 package org.gradle.testing
 
 import org.gradle.api.tasks.testing.ExecuteTestBuildOperationType
+import org.gradle.api.tasks.testing.TestOutputBuildOperationType
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
 import org.gradle.integtests.fixtures.BuildOperationsFixture
 import org.gradle.integtests.fixtures.TestResources
+import org.gradle.internal.operations.trace.BuildOperationRecord
 import org.junit.Rule
 
 class TestListenerBuildOperationAdapterIntegrationTest extends AbstractIntegrationSpec {
@@ -28,36 +30,48 @@ class TestListenerBuildOperationAdapterIntegrationTest extends AbstractIntegrati
 
     def operations = new BuildOperationsFixture(executer, temporaryFolder)
 
-    def "emits build operations for junit tests"() {
-        given:
-        resources.maybeCopy('/org/gradle/testing/junit/JUnitIntegrationTest/suitesOutputIsVisible')
+    def "emitsBuildOperationsForJUnitTests"() {
         when:
-        succeeds "test"
+        runAndFail "test"
 
-        then:
+        then:"test build operations are emitted in expected hierarchy"
+        def rootTestOp = operations.first(ExecuteTestBuildOperationType)
+        rootTestOp.details.testDescriptor.name.startsWith("Gradle Test Executor ")
+        rootTestOp.details.testDescriptor.className == null
+        rootTestOp.details.testDescriptor.composite == true
 
-        def ops = operations.all(ExecuteTestBuildOperationType) { true }
+        def firstLevelTestOps = directChildren(rootTestOp, ExecuteTestBuildOperationType)
+        firstLevelTestOps.size() == 2
+        firstLevelTestOps*.details.testDescriptor.name == ["org.gradle.Test", "org.gradle.TestSuite"]
+        firstLevelTestOps*.details.testDescriptor.className == ["org.gradle.Test", "org.gradle.TestSuite"]
+        firstLevelTestOps*.details.testDescriptor.composite == [true, true]
 
-        ops.size() == 5
-        ops[0].details.testDescriptor.name == "Gradle Test Executor 1"
-        ops[0].details.testDescriptor.className == null
-        ops[0].details.testDescriptor.composite == true
+        def suiteTestOps = directChildren(firstLevelTestOps[1], ExecuteTestBuildOperationType)
+        suiteTestOps.size() == 4
+        suiteTestOps*.details.testDescriptor.name == ["ok", "fail", "otherFail", "otherOk"]
+        suiteTestOps*.details.testDescriptor.className == ["org.gradle.Test", "org.gradle.Test", "org.gradle.OtherTest", "org.gradle.OtherTest"]
+        suiteTestOps*.details.testDescriptor.composite == [false, false, false, false]
+        suiteTestOps*.details.testDescriptor.composite == [false, false, false, false]
 
-        ops[1].details.testDescriptor.name == "org.gradle.ASuite"
-        ops[1].details.testDescriptor.className == "org.gradle.ASuite"
-        ops[1].details.testDescriptor.composite == true
+        def testTestOps = directChildren(firstLevelTestOps[0], ExecuteTestBuildOperationType)
+        testTestOps.size() == 2
+        testTestOps*.details.testDescriptor.name == ["ok", "fail"]
+        testTestOps*.details.testDescriptor.className == ["org.gradle.Test", "org.gradle.Test"]
+        testTestOps*.details.testDescriptor.composite == [false, false]
 
-        ops[2].details.testDescriptor.name == "anotherOk"
-        ops[2].details.testDescriptor.className == "org.gradle.OkTest"
-        ops[2].details.testDescriptor.composite == false
+        and:"outputs are emitted in test build operation hierarchy"
+        def testSuiteOutput = directChildren(firstLevelTestOps[1], TestOutputBuildOperationType)
+        testSuiteOutput.size() == 4
+        testSuiteOutput*.result.output.message == ["before suite class out\n" , "before suite class err\n" , "after suite class out\n", "after suite class err\n"]
+        testSuiteOutput*.result.output.destination == ["StdOut", "StdErr", "StdOut", "StdErr"]
 
-        ops[3].details.testDescriptor.name == "ok"
-        ops[3].details.testDescriptor.className == "org.gradle.OkTest"
-        ops[3].details.testDescriptor.composite == false
-
-        ops[4].details.testDescriptor.className == "org.gradle.OtherTest"
-        ops[4].details.testDescriptor.name == "ok"
-        ops[4].details.testDescriptor.composite == false
+        def testOutput = directChildren(testTestOps[0], TestOutputBuildOperationType)
+        testOutput.size() == 2
+        testOutput*.result.output.message == ["sys out ok\n" , "sys err ok\n"]
+        testOutput*.result.output.destination == ["StdOut", "StdErr"]
     }
 
+    def directChildren(BuildOperationRecord parent, Class<ExecuteTestBuildOperationType> operationType) {
+        return operations.search(parent, operationType) { it.parentId == parent.id }
+    }
 }
